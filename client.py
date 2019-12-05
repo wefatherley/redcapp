@@ -138,7 +138,7 @@ def _post_urlencoded(connection, headers, data):
     finally:
         resp = resp.status, resp.reason, resp.version, \
             headers, resp.read().decode("latin-1")
-        self.close()
+        connection.close()
         return resp
 
 
