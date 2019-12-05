@@ -5,6 +5,7 @@ __license__ = 'MIT'
 
 import csv
 import datetime
+import functools
 import http.client
 import itertools
 import json
@@ -35,6 +36,35 @@ VALID_OPTIONS = {
     ).split(",")
 }
 
+
+class DotMap(dict): # dep
+    """Access `dict` k-v pairs w/ dot notation"""
+    def __getattr__(self, attr):
+        return self.get(attr)
+
+    def __setattr__(self, key, value):
+        self.__setitem__(key, value)
+
+    def __setitem__(self, key, value):
+        super(Map, self).__setitem__(key, value)
+        self.__dict__.update({key: value})
+
+    def __delattr__(self, item):
+        self.__delitem__(item)
+
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        del self.__dict__[key]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for arg in args:
+            if isinstance(arg, dict):
+                for k, v in arg.items():
+                    self[k] = v
+        if kwargs:
+            for k, v in kwargs.items():
+                self[k] = v
 
 def make_pythonic(blogic):
     """Accepts branching logic string, and returns
@@ -97,7 +127,7 @@ def _post_urlencoded(connection, headers, data):
             data
         ).encode("latin-1")
     elif isinstance(data, (list, tuple)):
-        raise RuntimeError("malformed POST data?")
+        raise RuntimeError("not implemented :/")
     if connection.sock is None:
         try:
             connection.connect()
@@ -151,21 +181,53 @@ class Connector(http.client.HTTPSConnection):
             headers = HEADERS,
             data = params
         )
-        if params["content"] == "metadata":
+        if params["content"] == "json":
+            return json.loads(
+                response[-1]
+            )
+
+    def do_import(self, token=TOKEN, **parameters):
+        pass
+
+    def __init__(self, token=TOKEN, meta=None):
+        if CERTBUNDLE:
+            self.ssl_context = ssl.create_default_context(
+                ssl.Purpose.CLIENT_AUTH
+            )
+            ssl_context.load_cert_chain(CERTBUNDLE)
+        else:
+            self.ssl_context = ssl.create_default_context()
+        self.token = token
+        super().__init__(
+            host = HOST,
+            port = 443, 
+            timeout = socket._GLOBAL_DEFAULT_TIMEOUT,
+            context = self.ssl_context
+        )
+        if meta:
             metadata = json.loads(
                 _post_urlencoded(
                     connection = self,
                     headers = HEADERS,
-                    data = params
+                    data = {
+                        "token" : self.token,
+                        "content" : "metadata",
+                        "format" : "json"
+                    }
                 )[-1]
             )
             fieldnames = json.loads(
                 _post_urlencoded(
                     connection = self,
                     headers = HEADERS,
-                    data = params
+                    data = {
+                        "token" : self.token,
+                        "content" : "exportFieldNames",
+                        "format" : "json"
+                    }
                 )[-1]
             )
+            self.meta = []
             while len(fieldnames) > 0:
                 fn = fieldnames.pop()
                 meta = filter(
@@ -176,31 +238,12 @@ class Connector(http.client.HTTPSConnection):
                 meta["pbl"] = make_pythonic(
                     meta["branching_logic"]
                 )
-                setattr(self, fn["export_field_name"], meta)
-            
-
-    def do_import(self, token=TOKEN, **parameters):
-        pass
-
-    def __init__(self, token=TOKEN, metadata=None):
-        if CERTBUNDLE:
-            self.ssl_context = ssl.create_default_context(
-                ssl.Purpose.CLIENT_AUTH
-            )
-            ssl_context.load_cert_chain(CERTBUNDLE)
-        else:
-            self.ssl_context = ssl.create_default_context()
-        super().__init__(
-            host = HOST,
-            port = 443, 
-            timeout = socket._GLOBAL_DEFAULT_TIMEOUT,
-            context = self.ssl_context
-        )
-        self.token = token
-        if metadata:
-            self.metadata = self.do_export(
-                content="metadata"
-            )
+                #meta = DotMap(meta)
+                #setattr(self, fn["export_field_name"], meta)
+                self.meta.append(
+                    (fn["export_field_name"], meta)
+                )
+            self.meta = dict(self.meta)
 
     def __enter__(self):
         return self
