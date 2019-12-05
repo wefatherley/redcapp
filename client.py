@@ -99,82 +99,82 @@ class MetaDict(dict):
 
 
 def _post_urlencoded(connection, headers, data):
-        """Handles HTTP's POST procedure. Note the three
-        arguments to this function, as they are our
-        abstraction for the underlying HTTP specification,
+    """Handles HTTP's POST procedure. Note the three
+    arguments to this function, as they are our
+    abstraction for the underlying HTTP specification,
 
-        i.e.
-            POST /index.html HTTP/1.1 ---> `connection`
-            content-type: text        ---> `headers`
-            accept: *                 ---> `headers`
-                                      ---> `headers`
-            ?date=&id=&...            ---> `data`
+    i.e.
+        POST /index.html HTTP/1.1 ---> `connection`
+        content-type: text        ---> `headers`
+        accept: *                 ---> `headers`
+                                    ---> `headers`
+        ?date=&id=&...            ---> `data`
 
-        Returns the the tuple
-          ```(
-              http.client.HTTPResponse.status, 
-              http.client.HTTPResponse.reason, 
-              http.client.HTTPResponse.version,
-              dict(http.client.HTTPResponse.getheaders()), 
-              http.client.HTTPResponse.read()
-          )```
-        if `http.client.HTTPResponse.status == 200`, and if
-        the response's content length header > 0.
-        """
-        if data is None or data == "":
-            # TODO: logging
-            raise http.client.CannotSendRequest(
-                "Nothing to POST."
-            )
-        elif isinstance(data, dict):
-            data = urllib.parse.urlencode(
-                data
-            ).encode("latin-1")
-        elif isinstance(data, (list, tuple)):
-            raise RuntimeError("malformed POST data?")
+    Returns the the tuple
+        ```(
+            http.client.HTTPResponse.status, 
+            http.client.HTTPResponse.reason, 
+            http.client.HTTPResponse.version,
+            dict(http.client.HTTPResponse.getheaders()), 
+            http.client.HTTPResponse.read()
+        )```
+    if `http.client.HTTPResponse.status == 200`, and if
+    the response's content length header > 0.
+    """
+    if data is None or data == "":
+        # TODO: logging
+        raise http.client.CannotSendRequest(
+            "Nothing to POST."
+        )
+    elif isinstance(data, dict):
+        data = urllib.parse.urlencode(
+            data
+        ).encode("latin-1")
+    elif isinstance(data, (list, tuple)):
+        raise RuntimeError("malformed POST data?")
 
-        if connection.sock is None:
-            try:
-                connection.connect()
-            except:
-                # TODO: logging
-                raise # might need to ref another attrib
+    if connection.sock is None:
         try:
-            connection.putrequest(
-                method="POST",
-                url=API_DIR,
-                skip_host=True,
-                skip_accept_encoding=True
-            )
-            for k,v in headers: # might need ordereddict
-                connection.putheader(k,v)
-            connection.endheaders(
-                message_body=data,
-                encode_chunked=False
-            )
+            connection.connect()
         except:
             # TODO: logging
-            raise
+            raise # might need to ref another attrib
+    try:
+        connection.putrequest(
+            method="POST",
+            url=API_DIR,
+            skip_host=True,
+            skip_accept_encoding=True
+        )
+        for k,v in headers: # might need ordereddict
+            connection.putheader(k,v)
+        connection.endheaders(
+            message_body=data,
+            encode_chunked=False
+        )
+    except:
+        # TODO: logging
+        raise
+    else:
+        resp = connection.getresponse()
+        if resp.status != 200:
+            raise http.client.HTTPException(
+                "No data :/"
+            )
         else:
-            resp = connection.getresponse()
-            if resp.status != 200:
-                raise http.client.HTTPException(
+            headers = dict(
+                resp.getheaders()
+            )
+            cl = header.get("content-length")
+            if cl is None or cl <= 0 or cl > MAX_BYTES:
+                raise Exception(
                     "No data :/"
                 )
-            else:
-                headers = dict(
-                    resp.getheaders()
-                )
-                cl = header.get("content-length")
-                if cl is None or cl <= 0 or cl > MAX_BYTES:
-                    raise Exception(
-                        "No data :/"
-                    )
-        finally:
-            resp = resp.status, resp.reason, resp.version, \
-                headers, resp.read().decode("latin-1")
-            self.close()
-            return resp
+    finally:
+        resp = resp.status, resp.reason, resp.version, \
+            headers, resp.read().decode("latin-1")
+        self.close()
+        return resp
 
 
 class Connector(http.client.HTTPSConnection):
@@ -217,7 +217,7 @@ class Connector(http.client.HTTPSConnection):
                 content="exportFieldNames"
             )
 
-    def __enter(self):
+    def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
