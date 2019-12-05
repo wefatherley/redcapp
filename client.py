@@ -40,30 +40,30 @@ class MetaDict(dict):
     """Dot-notation container for metadata and field 
     names."""
     @staticmethod
-    def make_pythonic(bl):
+    def make_pythonic(blogic):
         checkbox_snoop = re.findall(
             "\[[a-z0-9_]*\([0-9]*\)\]", 
-            bl
+            blogic
         )
         if len(checkbox_snoop) > 0:
             for item in checkbox_snoop: #left to right
                 item = re.sub("\)\]", "\']", item)
                 item = re.sub("\(", "___", item)
                 item = re.sub("\[", "record[\'", item)
-                bl = re.sub(
+                blogic = re.sub(
                     "\[[a-z0-9_]*\([0-9]*\)\]",
                     item,
-                    branching_logic
+                    blogic
                 )
-            bl = re.sub("<=", "Z11Z", bl)
-            bl = re.sub(">=", "X11X", bl)
-            bl = re.sub("=", "==", bl)
-            bl = re.sub("Z11Z", "<=", bl)
-            bl = re.sub("X11X", ">=", bl)
-            bl = re.sub("<>", "!=", bl)
-            bl = re.sub("\[", "record[\'", bl)
-            bl = re.sub("\]", "\']", bl)
-        return bl
+            blogic = re.sub("<=", "Z11Z", blogic)
+            blogic = re.sub(">=", "X11X", blogic)
+            blogic = re.sub("=", "==", blogic)
+            blogic = re.sub("Z11Z", "<=", blogic)
+            blogic = re.sub("X11X", ">=", blogic)
+            blogic = re.sub("<>", "!=", blogic)
+            blogic = re.sub("\[", "record[\'", blogic)
+            blogic = re.sub("\]", "\']", blogic)
+        return blogic
 
     def __getattr__(self, attr):
         return self.get(attr)
@@ -120,7 +120,7 @@ def _post_urlencoded(connection, headers, data):
           )```
         if `http.client.HTTPResponse.status == 200`, and if
         the response's content length header > 0.
-          """
+        """
         if data is None or data == "":
             # TODO: logging
             raise http.client.CannotSendRequest(
@@ -173,6 +173,7 @@ def _post_urlencoded(connection, headers, data):
         finally:
             resp = resp.status, resp.reason, resp.version, \
                 headers, resp.read().decode("latin-1")
+            self.close()
             return resp
 
 
