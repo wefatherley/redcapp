@@ -17,7 +17,6 @@ import urllib.parse
 
 CERTBUNDLE = os.getenv("CLIENT_CERTS", None) #dev
 MAX_BYTES = os.getenv("REDCAP_MAX_READ", 1000000) #dev
-TOKEN = os.getenv("REDCAP_TOKEN", None)
 HOST = os.getenv("REDCAP_HOST", None)
 API_DIR = os.getenv("REDCAP_API_DIR", None)
 HEADERS = { # must build in decaptalize
@@ -26,6 +25,7 @@ HEADERS = { # must build in decaptalize
     "accept-encoding" : "identity",
     "host": HOST
 } # might need ordereddict
+TOKEN = os.getenv("REDCAP_TOKEN", None)
 VALID_OPTIONS = {
     option : None
     for option in
@@ -36,66 +36,32 @@ VALID_OPTIONS = {
 }
 
 
-class MetaDict(dict):
-    """Dot-notation container for metadata and field 
-    names."""
-    @staticmethod
-    def make_pythonic(blogic):
-        checkbox_snoop = re.findall(
-            "\[[a-z0-9_]*\([0-9]*\)\]", 
-            blogic
-        )
-        if len(checkbox_snoop) > 0:
-            for item in checkbox_snoop: #left to right
-                item = re.sub("\)\]", "\']", item)
-                item = re.sub("\(", "___", item)
-                item = re.sub("\[", "record[\'", item)
-                blogic = re.sub(
-                    "\[[a-z0-9_]*\([0-9]*\)\]",
-                    item,
-                    blogic
-                )
-            blogic = re.sub("<=", "Z11Z", blogic)
-            blogic = re.sub(">=", "X11X", blogic)
-            blogic = re.sub("=", "==", blogic)
-            blogic = re.sub("Z11Z", "<=", blogic)
-            blogic = re.sub("X11X", ">=", blogic)
-            blogic = re.sub("<>", "!=", blogic)
-            blogic = re.sub("\[", "record[\'", blogic)
-            blogic = re.sub("\]", "\']", blogic)
-        return blogic
-
-    def __getattr__(self, attr):
-        return self.get(attr)
-
-    def __setattr__(self, key, value):
-        self.__setitem__(key, value)
-
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-        self.__dict__.update({key : value})
-
-    def __delattr__(self, item):
-        self.__delitem__(item)
-
-    def __delitem__(self, key):
-        super().__delitem__(key)
-        del self.__dict__[key]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for arg in args:
-            if isinstance(arg, dict):
-                if len(arg) > 3: #it's metadata
-                    arg["python_bl"] = make_pythonic(
-                        arg["branching_logic"]
-                    )
-                    self[arg["field_name"]] = arg
-                if len(arg) == 3: #it's fieldnames
-                    self[arg["export_field_name"]] = arg
-        if kwargs:
-            for k, v in kwargs.items():
-                self[k] = v
+def make_pythonic(blogic):
+    """Accepts branching logic string, and returns
+    another that is pythonic. Currently very ugly."""
+    checkbox_snoop = re.findall( #left to right
+        "\[[a-z0-9_]*\([0-9]*\)\]", 
+        blogic
+    )
+    if len(checkbox_snoop) > 0:
+        for item in checkbox_snoop: #left to right
+            item = re.sub("\)\]", "\']", item)
+            item = re.sub("\(", "___", item)
+            item = re.sub("\[", "record[\'", item)
+            blogic = re.sub(
+                "\[[a-z0-9_]*\([0-9]*\)\]",
+                item,
+                blogic
+            )
+        blogic = re.sub("<=", "Z11Z", blogic)
+        blogic = re.sub(">=", "X11X", blogic)
+        blogic = re.sub("=", "==", blogic)
+        blogic = re.sub("Z11Z", "<=", blogic)
+        blogic = re.sub("X11X", ">=", blogic)
+        blogic = re.sub("<>", "!=", blogic)
+        blogic = re.sub("\[", "record[\'", blogic)
+        blogic = re.sub("\]", "\']", blogic)
+    return blogic
 
 
 def _post_urlencoded(connection, headers, data):
@@ -107,11 +73,11 @@ def _post_urlencoded(connection, headers, data):
         POST /index.html HTTP/1.1 ---> `connection`
         content-type: text        ---> `headers`
         accept: *                 ---> `headers`
-                                    ---> `headers`
+                                  ---> `headers`
         ?date=&id=&...            ---> `data`
 
     Returns the the tuple
-        ```(
+    ```(
             http.client.HTTPResponse.status, 
             http.client.HTTPResponse.reason, 
             http.client.HTTPResponse.version,
@@ -132,7 +98,6 @@ def _post_urlencoded(connection, headers, data):
         ).encode("latin-1")
     elif isinstance(data, (list, tuple)):
         raise RuntimeError("malformed POST data?")
-
     if connection.sock is None:
         try:
             connection.connect()
@@ -179,22 +144,45 @@ def _post_urlencoded(connection, headers, data):
 
 class Connector(http.client.HTTPSConnection):
     """Context manager for working with REDCap API."""
-    def do_export(self, token=TOKEN, **parameters):
-        paramaters = {"token": token, **parameters}
+    def do_export(self, token=self.token, **parameters):
+        params = {"token": token, **parameters}
         response = _post_urlencoded(
             connection = self,
             headers = HEADERS,
-            data = parameters
+            data = params
         )
-        if parameters["content"] == "metadata":
-            return Metadata(response[-1])
-        if parameters["content"] == "exportFieldNames":
-            return Fieldnames(response[-1])
+        if params["content"] == "metadata":
+            metadata = json.loads(
+                _post_urlencoded(
+                    connection = self,
+                    headers = HEADERS,
+                    data = params
+                )[-1]
+            )
+            fieldnames = json.loads(
+                _post_urlencoded(
+                    connection = self,
+                    headers = HEADERS,
+                    data = params
+                )[-1]
+            )
+            while len(fieldnames) > 0:
+                fn = fieldnames.pop()
+                meta = filter(
+                    lambda d: d["field_name"] \
+                    == fn["original_field_name"],
+                    metadata
+                ).pop()
+                meta["pbl"] = make_pythonic(
+                    meta["branching_logic"]
+                )
+                setattr(self, fn["export_field_name"], meta)
+            
 
     def do_import(self, token=TOKEN, **parameters):
         pass
 
-    def __init__(self, metadata=None, fieldnames=None):
+    def __init__(self, token=TOKEN, metadata=None):
         if CERTBUNDLE:
             self.ssl_context = ssl.create_default_context(
                 ssl.Purpose.CLIENT_AUTH
@@ -208,13 +196,10 @@ class Connector(http.client.HTTPSConnection):
             timeout = socket._GLOBAL_DEFAULT_TIMEOUT,
             context = self.ssl_context
         )
+        self.token = token
         if metadata:
             self.metadata = self.do_export(
                 content="metadata"
-            )
-        if fieldname:
-            self.fieldnames = self.do_export(
-                content="exportFieldNames"
             )
 
     def __enter__(self):
