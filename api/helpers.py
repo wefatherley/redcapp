@@ -1,64 +1,80 @@
+"""Helper objects"""
+
+# ----------------------------------------------------------------------
+# imports, includes, hacks, etc.
+# ----------------------------------------------------------------------
+
 import datetime
 import re
 
+__all__ = [
+    "make_pythonic_bl",
+    "cast_record"
+]
 
-def date_dmy(str):
+
+# ----------------------------------------------------------------------
+# format utilities
+# ----------------------------------------------------------------------
+
+
+def date_dmy(item):
     frmt = '%d-%m-%Y'
-    return datetime.date.strptime(str, frmt)
+    return datetime.date.strptime(item, frmt)
 
 
-def date_mdy(str):
+def date_mdy(item):
     frmt = '%m-%d-%Y'
-    return datetime.date.strptime(str, frmt)
+    return datetime.date.strptime(item, frmt)
 
 
-def date_ymd(str):
+def date_ymd(item):
     frmt = '%Y-%m-%d'
-    return datetime.date.strptime(str, frmt)
+    return datetime.date.strptime(item, frmt)
 
 
-def datetime_dmy(str):
+def datetime_dmy(item):
     frmt = '%d-%m-%Y %H:%M'
-    return datetime.datetime.strptime(str, frmt)
+    return datetime.datetime.strptime(item, frmt)
 
 
-def datetime_mdy(str):
+def datetime_mdy(item):
     frmt = '%m-%d-%Y %H:%M'
-    return datetime.datetime.strptime(str, frmt)
+    return datetime.datetime.strptime(item, frmt)
 
 
-def datetime_ymd(str):
+def datetime_ymd(item):
     frmt = '%Y-%m-%d %H:%M'
-    return datetime.datetime.strptime(str, frmt)
+    return datetime.datetime.strptime(item, frmt)
 
 
-def datetime_seconds_dmy(str):
+def datetime_seconds_dmy(item):
     frmt = '%Y-%m-%d %H:%M:%S'
-    return datetime.datetime.strptime(str, frmt)
+    return datetime.datetime.strptime(item, frmt)
 
 
-def datetime_seconds_mdy(str):
+def datetime_seconds_mdy(item):
     frmt = '%m-%d-%Y %H:%M:%S'
-    return datetime.datetime.strptime(str, frmt)
+    return datetime.datetime.strptime(item, frmt)
 
 
-def datetime_seconds_ymd(str):
+def datetime_seconds_ymd(item):
     frmt = '%Y-%m-%d %H:%M:%S'
-    return datetime.datetime.strptime(str, frmt)
+    return datetime.datetime.strptime(item, frmt)
 
 
-def time_hm(str):
+def time_hm(item):
     frmt = '%H:%M'
-    return datetime.time.strptime(str, frmt)
+    return datetime.time.strptime(item, frmt)
 
 
-def time_mm_ss(str):
+def time_mm_ss(item):
     frmt = '%M:%S'
-    return datetime.time.strptime(str, frmt)
+    return datetime.time.strptime(item, frmt)
 
 
-def make_decimal(str):
-    return float(re.sub(',', '.', str))
+def make_decimal(item):
+    return float(re.sub(',', '.', item))
 
 
 cast_map = {
@@ -97,7 +113,12 @@ cast_map = {
 }
 
 
-def make_pythonic(blogic):
+# ----------------------------------------------------------------------
+# public objects
+# ----------------------------------------------------------------------
+
+
+def make_pythonic_bl(blogic):
     """
     Accepts branching logic string, and returns
     another with Pythonic syntax.
@@ -136,3 +157,8 @@ def cast_record(record, metadata):
             ]
         ](v)
     return record
+
+
+class Payload(object):
+    """Validation class for speaking to REDCap API"""
+    pass

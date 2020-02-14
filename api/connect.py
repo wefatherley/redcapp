@@ -1,4 +1,9 @@
 """Connector objects and related items"""
+
+# ----------------------------------------------------------------------
+# imports, includes, hacks, etc.
+# ----------------------------------------------------------------------
+
 import csv
 import http.client
 import json
@@ -8,39 +13,32 @@ import socket
 import ssl
 import urllib.parse
 
-from .helpers import make_pythonic
-
+from .helpers import (
+    make_pythonic,
+    cast_record,
+    Payload
+)
 
 __all__ = [
     "Connector"
 ]
 
-
-#
-# HTTP state constants
-#
-
 CERTBUNDLE = os.getenv("CLIENT_CERTS", None)
 HOST = os.getenv("REDCAP_HOST", None)
-API_DIR = os.getenv("REDCAP_API_DIR", None)
-HEADERS = { # must build in decaptalize
+API_PATH = os.getenv("REDCAP_API_DIR", None)
+HEADERS = {
     "user-agent" : "REDCapp/1.0",
     "content-type" : "application/x-www-form-urlencoded",
     "accept-encoding" : "identity",
     "host": HOST
 }
 
-
-#
-# REDCap state constants
-#
-
 TOKEN = os.getenv("REDCAP_TOKEN", None)
 
 
-#
-# Connectors
-#
+# ----------------------------------------------------------------------
+# Connector classes
+# ----------------------------------------------------------------------
 
 class BaseConnector(http.client.HTTPSConnection):
     """Base class for connecting to a REDCap API"""
@@ -63,7 +61,7 @@ class BaseConnector(http.client.HTTPSConnection):
         try:
             connection.putrequest(
                 method="POST",
-                url=API_DIR,
+                url=API_PATH,
                 skip_host=True,
                 skip_accept_encoding=True
             )
@@ -117,7 +115,6 @@ class Connector(BaseConnector):
             metadata = json.loads(
                 self._post_urlencoded(
                     connection = self,
-                    headers = HEADERS,
                     data = {
                         "token": token,
                         "content": "metadata",
@@ -128,7 +125,6 @@ class Connector(BaseConnector):
             fieldnames = json.loads(
                 self._post_urlencoded(
                     connection = self,
-                    headers = HEADERS,
                     data = {
                         "token": token,
                         "content": "exportFieldNames",
@@ -144,7 +140,7 @@ class Connector(BaseConnector):
                     == fn["original_field_name"],
                     metadata
                 )).pop()
-                metadatum["pbl"] = make_pythonic(
+                metadatum["pbl"] = make_pythonic_bl(
                     metadatum["branching_logic"]
                 )
                 self.meta.append(
@@ -152,25 +148,11 @@ class Connector(BaseConnector):
                 )
             self.meta = dict(self.meta)
 
-    def arms(self, action, **kwgs):
-        if action == "import":
-            pass
-        elif action == "export":
-            pass
-        elif action == "delete":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
+    def arms(self, **kwgs):
+        pass
 
-    def events(self, action, **kwgs):
-        if action == "import":
-            pass
-        elif action == "export":
-            pass
-        elif action == "delete":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
+    def events(self, **kwgs):
+        pass
 
     def field_names(self, action="export", **kwgs):
         if action != "export":
@@ -178,7 +160,6 @@ class Connector(BaseConnector):
                 "Can only export list of export field names"
             )
         pass
-        
 
     def files(self, action, **kwgs):
         if action == "import":
@@ -216,13 +197,14 @@ class Connector(BaseConnector):
         else:
             raise RuntimeError("Bad action :/")
 
-    def records(self, action, **kwgs):
-        if action == "import":
-            pass
-        elif action == "export":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
+    def records(self, **kwgs):
+        records = self._post_urlencoded(
+            connection=self,
+            data=Payload(self.token, **kwgs)
+        )
+        if kwgs.get("cast", ""):
+            records = [cast_record(r) for r in records]
+        return records
 
     def repeating_ie(self, action="export", **kwgs):
         if action != "export":
@@ -262,7 +244,7 @@ class Connector(BaseConnector):
             raise RuntimeError("Bad action :/")
 
     def __enter__(self):
-        pass
+        return self
 
     def __exit__(self, typ, val, trb):
         pass
