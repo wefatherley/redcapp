@@ -1,35 +1,5 @@
+import datetime
 import re
-
-
-def make_pythonic(blogic):
-    """
-    Accepts branching logic string, and returns
-    another that is valid python.Currently very ugly.
-    """
-    checkbox_snoop = re.findall( #left to right
-        "\[[a-z0-9_]*\([0-9]*\)\]", 
-        blogic
-    )
-    if len(checkbox_snoop) > 0:
-        for item in checkbox_snoop: #left to right
-            item = re.sub("\)\]", "\']", item)
-            item = re.sub("\(", "___", item)
-            item = re.sub("\[", "record[\'", item)
-            blogic = re.sub(
-                "\[[a-z0-9_]*\([0-9]*\)\]",
-                item,
-                blogic
-            )
-        blogic = re.sub("<=", "Z11Z", blogic)
-        blogic = re.sub(">=", "X11X", blogic)
-        blogic = re.sub("=", "==", blogic)
-        blogic = re.sub("Z11Z", "<=", blogic)
-        blogic = re.sub("X11X", ">=", blogic)
-        blogic = re.sub("<>", "!=", blogic)
-        blogic = re.sub("\[", "record[\'", blogic)
-        blogic = re.sub("\]", "\']", blogic)
-    return blogic
-
 
 
 def date_dmy(str):
@@ -91,7 +61,7 @@ def make_decimal(str):
     return float(re.sub(',', '.', str))
 
 
-text_validation_types = {
+cast_map = {
     'date_dmy'                 : date_dmy,
     'date_mdy'                 : date_mdy,
     'date_ymd'                 : date_ymd,
@@ -125,3 +95,44 @@ text_validation_types = {
     'Zipcode'                  : str,
     ''                         : str
 }
+
+
+def make_pythonic(blogic):
+    """
+    Accepts branching logic string, and returns
+    another with Pythonic syntax.
+    """
+    checkbox_snoop = re.findall( #left to right
+        "\[[a-z0-9_]*\([0-9]*\)\]", 
+        blogic
+    )
+    if len(checkbox_snoop) > 0:
+        for item in checkbox_snoop: #left to right
+            item = re.sub("\)\]", "\']", item)
+            item = re.sub("\(", "___", item)
+            item = re.sub("\[", "record[\'", item)
+            blogic = re.sub(
+                "\[[a-z0-9_]*\([0-9]*\)\]",
+                item,
+                blogic
+            )
+        blogic = re.sub("<=", "Z11Z", blogic)
+        blogic = re.sub(">=", "X11X", blogic)
+        blogic = re.sub("=", "==", blogic)
+        blogic = re.sub("Z11Z", "<=", blogic)
+        blogic = re.sub("X11X", ">=", blogic)
+        blogic = re.sub("<>", "!=", blogic)
+        blogic = re.sub("\[", "record[\'", blogic)
+        blogic = re.sub("\]", "\']", blogic)
+    return blogic
+
+
+def cast_record(record, metadata):
+    """Casts a record's data to respective Python type"""
+    for k,v in record:
+        v = cast_map[
+            metadata[k][
+                "text_validation_type_or_show_slider_number"
+            ]
+        ](v)
+    return record

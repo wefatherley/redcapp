@@ -106,7 +106,7 @@ class BaseConnector(http.client.HTTPSConnection):
 class Connector(BaseConnector):
     """Public connector for communicating with REDCap API"""
 
-    def __init__(self, token=TOKEN, meta=None):
+    def __init__(self, token=TOKEN, loadmeta=False):
         """Initialize Connector instance"""
         super().__init__()
         if not token:
@@ -139,57 +139,127 @@ class Connector(BaseConnector):
             self.meta = []
             while len(fieldnames) > 0:
                 fn = fieldnames.pop()
-                meta = filter(
+                metadatum = list(filter(
                     lambda d: d["field_name"] \
                     == fn["original_field_name"],
                     metadata
-                ).pop()
-                meta["pbl"] = make_pythonic(
-                    meta["branching_logic"]
+                )).pop()
+                metadatum["pbl"] = make_pythonic(
+                    metadatum["branching_logic"]
                 )
                 self.meta.append(
-                    (fn["export_field_name"], meta)
+                    (fn["export_field_name"], metadatum)
                 )
             self.meta = dict(self.meta)
 
-    def arms(self):
+    def arms(self, action, **kwgs):
+        if action == "import":
+            pass
+        elif action == "export":
+            pass
+        elif action == "delete":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
+
+    def events(self, action, **kwgs):
+        if action == "import":
+            pass
+        elif action == "export":
+            pass
+        elif action == "delete":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
+
+    def field_names(self, action="export", **kwgs):
+        if action != "export":
+            raise RuntimeError(
+                "Can only export list of export field names"
+            )
+        pass
+        
+
+    def files(self, action, **kwgs):
+        if action == "import":
+            pass
+        elif action == "export":
+            pass
+        elif action == "delete":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
+
+    def instruments(self, action, **kwgs):
+        if action == "import":
+            pass
+        elif action == "export":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
+
+    def metadata(self, action, **kwgs):
+        if action == "create":
+            pass
+        elif action == "import":
+            pass
+        elif action == "export":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
+
+    def projects(self, action, **kwgs):
+        if action == "import":
+            pass
+        elif action == "export":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
+
+    def records(self, action, **kwgs):
+        if action == "import":
+            pass
+        elif action == "export":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
+
+    def repeating_ie(self, action="export", **kwgs):
+        if action != "export":
+            raise RuntimeError(
+                "Can only export list of export" \
+                + " repeating instruments and events :/"
+            )
         pass
 
-    def events(self):
+    def reports(self, action="export", **kwgs):
+        if action != "export":
+            raise RuntimeError(
+                "Can only export report :/"
+            )
         pass
 
-    def field_names(self):
+    def redcap(self, action="export", **kwgs):
+        if action != "export":
+            raise RuntimeError(
+                "Can only export REDCap version :/"
+            )
         pass
 
-    def files(self):
+    def surveys(self, action="export", **kwgs):
+        if action != "export":
+            raise RuntimeError(
+                "Can only export surveys :/"
+            )
         pass
 
-    def instruments(self):
-        pass
-
-    def metadata(self):
-        pass
-
-    def projects(self):
-        pass
-
-    def records(self):
-        pass
-
-    def repeating_ie(self):
-        pass
-
-    def reports(self):
-        pass
-
-    def redcap(self):
-        pass
-
-    def surveys(self):
-        pass
-
-    def users(self):
-        pass
+    def users(self, action, **kwgs):
+        if action == "import":
+            pass
+        elif action == "export":
+            pass
+        else:
+            raise RuntimeError("Bad action :/")
 
     def __enter__(self):
         pass
