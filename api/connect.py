@@ -6,6 +6,7 @@
 
 import csv
 import http.client
+import inspect
 import json
 import os
 import re
@@ -19,29 +20,44 @@ from .helpers import (
     Payload
 )
 
-__all__ = [
-    "Connector"
-]
-
-CERTBUNDLE = os.getenv("CLIENT_CERTS", None)
-HOST = os.getenv("REDCAP_HOST", None)
-API_PATH = os.getenv("REDCAP_API_DIR", None)
-HEADERS = {
-    "user-agent" : "REDCapp/1.0",
-    "content-type" : "application/x-www-form-urlencoded",
-    "accept-encoding" : "identity",
-    "host": HOST
-}
-
-TOKEN = os.getenv("REDCAP_TOKEN", None)
+__all__ = ["Connector"]
 
 
 # ----------------------------------------------------------------------
 # Connector classes
 # ----------------------------------------------------------------------
 
+
+class Session(object):
+    def __new__(cls, nme, bses, dct):
+        obj = super().__new__(cls, nme, bses, dct)
+        return obj
+    def __init__(self):
+        pass
+    def __enter__(self):
+        return self
+    def __exit__(self, typ, val, trb):
+        pass
+
+
 class BaseConnector(http.client.HTTPSConnection):
     """Base class for connecting to a REDCap API"""
+
+    def __init__(self):
+        """Initialize BaseConnector instance"""
+        if CERTBUNDLE:
+            self.ssl_context = ssl.create_default_context(
+                ssl.Purpose.SERVER_AUTH
+            )
+            ssl_context.load_cert_chain(CERTBUNDLE)
+        else:
+            self.ssl_context = ssl.create_default_context()
+        super().__init__(
+            host = HOST,
+            port = 443, 
+            timeout = socket._GLOBAL_DEFAULT_TIMEOUT,
+            context = self.ssl_context
+        )
     
     @staticmethod
     def _post_urlencoded(connection, data=None):
@@ -83,23 +99,6 @@ class BaseConnector(http.client.HTTPSConnection):
             connection.close()
             return response.read().decode("latin-1")
 
-    def __init__(self):
-        """Initialize BaseConnector instance"""
-        if CERTBUNDLE:
-            self.ssl_context = ssl.create_default_context(
-                ssl.Purpose.CLIENT_AUTH
-            )
-            ssl_context.load_cert_chain(CERTBUNDLE)
-        else:
-            self.ssl_context = ssl.create_default_context()
-        self.token = token
-        super().__init__(
-            host = HOST,
-            port = 443, 
-            timeout = socket._GLOBAL_DEFAULT_TIMEOUT,
-            context = self.ssl_context
-        )
-
 
 class Connector(BaseConnector):
     """Public connector for communicating with REDCap API"""
@@ -111,7 +110,7 @@ class Connector(BaseConnector):
             raise RuntimeError("No API token provided :/")
         else:
             self.token = token
-        if meta:
+        if loadmeta:
             metadata = json.loads(
                 self._post_urlencoded(
                     connection = self,
@@ -136,16 +135,13 @@ class Connector(BaseConnector):
             while len(fieldnames) > 0:
                 fn = fieldnames.pop()
                 metadatum = list(filter(
-                    lambda d: d["field_name"] \
-                    == fn["original_field_name"],
+                    lambda d: d["field_name"] == fn["original_field_name"],
                     metadata
                 )).pop()
                 metadatum["pbl"] = make_pythonic_bl(
                     metadatum["branching_logic"]
                 )
-                self.meta.append(
-                    (fn["export_field_name"], metadatum)
-                )
+                self.meta.append((fn["export_field_name"], metadatum))
             self.meta = dict(self.meta)
 
     def arms(self, **kwgs):
@@ -200,7 +196,7 @@ class Connector(BaseConnector):
     def records(self, **kwgs):
         records = self._post_urlencoded(
             connection=self,
-            data=Payload(self.token, **kwgs)
+            data=Payload(token = self.token, **kwgs)
         )
         if kwgs.get("cast", ""):
             records = [cast_record(r) for r in records]

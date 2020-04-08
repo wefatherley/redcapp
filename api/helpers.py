@@ -17,7 +17,6 @@ __all__ = [
 # format utilities
 # ----------------------------------------------------------------------
 
-
 def date_dmy(item):
     frmt = '%d-%m-%Y'
     return datetime.date.strptime(item, frmt)
@@ -159,6 +158,6 @@ def cast_record(record, metadata):
     return record
 
 
-class Payload(object):
+class Payload(dict):
     """Validation class for speaking to REDCap API"""
     pass
