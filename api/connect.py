@@ -4,12 +4,11 @@
 # imports, includes, hacks, etc.
 # ----------------------------------------------------------------------
 
-import csv
-import http.client
-import inspect
+#import csv
+from http import client, HTTPStatus
+#import inspect
 import json
 import os
-import re
 import socket
 import ssl
 import urllib.parse
@@ -24,27 +23,34 @@ __all__ = ["Connector"]
 
 
 # ----------------------------------------------------------------------
+# things from environment, and so derived
+# ----------------------------------------------------------------------
+
+CERTBUNDLE = os.getenv("REDCAPP_CLIENT_CERTS", None)
+HOST = os.getenv("REDCAPP_HOST", None)
+API_PATH = os.getenv("REDCAPP_API_DIR", None)
+HEADERS = {
+    "user-agent" : "redcapp/1.0",
+    "content-type" : "application/x-www-form-urlencoded",
+    "accept-encoding" : "identity",
+    "host": HOST,
+    "location": API_PATH
+}
+TOKEN = os.getenv("REDCAP_TOKEN", None)
+
+
+# ----------------------------------------------------------------------
 # Connector classes
 # ----------------------------------------------------------------------
 
 
-class Session(object):
-    def __new__(cls, nme, bses, dct):
-        obj = super().__new__(cls, nme, bses, dct)
-        return obj
-    def __init__(self):
-        pass
-    def __enter__(self):
-        return self
-    def __exit__(self, typ, val, trb):
-        pass
-
-
-class BaseConnector(http.client.HTTPSConnection):
+class BaseConnector(client.HTTPSConnection):
     """Base class for connecting to a REDCap API"""
 
     def __init__(self):
         """Initialize BaseConnector instance"""
+
+        # handle TLS situation
         if CERTBUNDLE:
             self.ssl_context = ssl.create_default_context(
                 ssl.Purpose.SERVER_AUTH
@@ -52,16 +58,20 @@ class BaseConnector(http.client.HTTPSConnection):
             ssl_context.load_cert_chain(CERTBUNDLE)
         else:
             self.ssl_context = ssl.create_default_context()
+
+        # initialize the base connector
         super().__init__(
             host = HOST,
-            port = 443, 
+            port = client.HTTPS_PORT, 
             timeout = socket._GLOBAL_DEFAULT_TIMEOUT,
             context = self.ssl_context
         )
     
     @staticmethod
-    def _post_urlencoded(connection, data=None):
+    def post_urlencoded(connection, data=None):
         """Handles POST procedure. Returns response data"""
+
+        # url-encode POST data
         if data is None or data == "":
             raise http.client.CannotSendRequest(
                 "Nothing to POST :/"
@@ -72,8 +82,8 @@ class BaseConnector(http.client.HTTPSConnection):
             ).encode("latin-1")
         elif isinstance(data, (list, tuple)):
             raise RuntimeError("not implemented :/")
-        if connection.sock is None:
-            connection.connect()
+        
+        # POST request data
         try:
             connection.putrequest(
                 method="POST",
@@ -87,32 +97,108 @@ class BaseConnector(http.client.HTTPSConnection):
                 message_body=data,
                 encode_chunked=False
             )
+
+        # just raise the problem
         except: raise
+
+        # if no excpetions, get the response
         else:
             response = connection.getresponse()
-            if response.status != 200:
+
+            # get data on 200
+            if response.status != HTTPStatus.OK:
                 connection.close()
                 raise http.client.HTTPException(
                     "No data :/"
                 )
         finally:
+
+            # close and return data
             connection.close()
             return response.read().decode("latin-1")
+
+        # TODO: keep-alive support, link support
 
 
 class Connector(BaseConnector):
     """Public connector for communicating with REDCap API"""
 
-    def __init__(self, token=TOKEN, loadmeta=False):
+    def __init__(self, token=None, deserializer=json.loads):
         """Initialize Connector instance"""
-        super().__init__()
+
+        # just get the token
         if not token:
             raise RuntimeError("No API token provided :/")
         else:
+            super().__init__()
             self.token = token
+            self._loads = deserializer
+
+    def arms(self, action, **kwgs):
+        pass
+
+    def events(self, action, **kwgs):
+        pass
+
+    def field_names(self, action, **kwgs):
+        pass
+
+    def files(self, action, **kwgs):
+        pass
+
+    def instruments(self, action, **kwgs):
+        pass
+
+    def metadata(self, action, **kwgs):
+        pass
+
+    def projects(self, action, **kwgs):
+        pass
+
+    def records(self, action, **kwgs):
+        pass
+
+    def repeating_ie(self, action, **kwgs):
+        pass
+
+    def reports(self, action, **kwgs):
+        pass
+
+    def redcap(self, action, **kwgs):
+        pass
+
+    def surveys(self, action, **kwgs):
+        pass
+
+    def users(self, action, **kwgs):
+        pass
+
+    def _sync_metadata(self):
+        pass
+
+    def __enter__(self):
+        """Support context manager protocol"""
+        return self
+
+    def __exit__(self, typ, val, trb):
+        return False
+
+
+if __name__ == "__main__":
+    pass
+
+
+"""
+DEPRECATED LAND:
+
+
+
+
+old load-metadata procedure from Connector.__init__:
+
         if loadmeta:
             metadata = json.loads(
-                self._post_urlencoded(
+                self.post_urlencoded(
                     connection = self,
                     data = {
                         "token": token,
@@ -122,7 +208,7 @@ class Connector(BaseConnector):
                 )
             )
             fieldnames = json.loads(
-                self._post_urlencoded(
+                self.post_urlencoded(
                     connection = self,
                     data = {
                         "token": token,
@@ -144,103 +230,5 @@ class Connector(BaseConnector):
                 self.meta.append((fn["export_field_name"], metadatum))
             self.meta = dict(self.meta)
 
-    def arms(self, **kwgs):
-        pass
-
-    def events(self, **kwgs):
-        pass
-
-    def field_names(self, action="export", **kwgs):
-        if action != "export":
-            raise RuntimeError(
-                "Can only export list of export field names"
-            )
-        pass
-
-    def files(self, action, **kwgs):
-        if action == "import":
-            pass
-        elif action == "export":
-            pass
-        elif action == "delete":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
-
-    def instruments(self, action, **kwgs):
-        if action == "import":
-            pass
-        elif action == "export":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
-
-    def metadata(self, action, **kwgs):
-        if action == "create":
-            pass
-        elif action == "import":
-            pass
-        elif action == "export":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
-
-    def projects(self, action, **kwgs):
-        if action == "import":
-            pass
-        elif action == "export":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
-
-    def records(self, **kwgs):
-        records = self._post_urlencoded(
-            connection=self,
-            data=Payload(token = self.token, **kwgs)
-        )
-        if kwgs.get("cast", ""):
-            records = [cast_record(r) for r in records]
-        return records
-
-    def repeating_ie(self, action="export", **kwgs):
-        if action != "export":
-            raise RuntimeError(
-                "Can only export list of export" \
-                + " repeating instruments and events :/"
-            )
-        pass
-
-    def reports(self, action="export", **kwgs):
-        if action != "export":
-            raise RuntimeError(
-                "Can only export report :/"
-            )
-        pass
-
-    def redcap(self, action="export", **kwgs):
-        if action != "export":
-            raise RuntimeError(
-                "Can only export REDCap version :/"
-            )
-        pass
-
-    def surveys(self, action="export", **kwgs):
-        if action != "export":
-            raise RuntimeError(
-                "Can only export surveys :/"
-            )
-        pass
-
-    def users(self, action, **kwgs):
-        if action == "import":
-            pass
-        elif action == "export":
-            pass
-        else:
-            raise RuntimeError("Bad action :/")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, typ, val, trb):
-        pass
+    This procedure was removed because it's not a real aspect in wrapping the API
+"""

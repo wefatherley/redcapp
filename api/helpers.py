@@ -158,6 +158,5 @@ def cast_record(record, metadata):
     return record
 
 
-class Payload(dict):
-    """Validation class for speaking to REDCap API"""
+class Record(object):
     pass
