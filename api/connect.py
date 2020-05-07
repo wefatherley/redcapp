@@ -173,9 +173,6 @@ class Connector(BaseConnector):
     def users(self, action, **kwgs):
         pass
 
-    def _sync_metadata(self):
-        pass
-
     def __enter__(self):
         """Support context manager protocol"""
         return self
@@ -191,7 +188,8 @@ if __name__ == "__main__":
 """
 DEPRECATED LAND:
 
-
+    def _sync_metadata(self):
+        pass
 
 
 old load-metadata procedure from Connector.__init__:
