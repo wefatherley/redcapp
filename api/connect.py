@@ -30,7 +30,7 @@ CERTBUNDLE = os.getenv("REDCAPP_CLIENT_CERTS", None)
 HOST = os.getenv("REDCAPP_HOST", None)
 API_PATH = os.getenv("REDCAPP_API_DIR", None)
 HEADERS = {
-    "user-agent" : "redcapp/1.0",
+    "user-agent" : "{}/{}".format("redcapp", "1.0"), # FIXME
     "content-type" : "application/x-www-form-urlencoded",
     "accept-encoding" : "identity",
     "host": HOST,
@@ -45,7 +45,11 @@ TOKEN = os.getenv("REDCAP_TOKEN", None)
 
 
 class BaseConnector(client.HTTPSConnection):
-    """Base class for connecting to a REDCap API"""
+    """
+    Base class for connecting to a REDCap API. Handles
+    lower-level aspects like HTTP requests and other
+    stuff down toward the transport layer.
+    """
 
     def __init__(self):
         """Initialize BaseConnector instance"""
@@ -121,7 +125,10 @@ class BaseConnector(client.HTTPSConnection):
 
 
 class Connector(BaseConnector):
-    """Public connector for communicating with REDCap API"""
+    """
+    Public connector for communicating with REDCap API. This
+    class is where all the API-specific logic is dealt with.
+    """
 
     def __init__(self, token=None, deserializer=json.loads):
         """Initialize Connector instance"""
@@ -144,6 +151,7 @@ class Connector(BaseConnector):
         pass
 
     def files(self, action, **kwgs):
+        # PIL for images?
         pass
 
     def instruments(self, action, **kwgs):
