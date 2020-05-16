@@ -14,7 +14,7 @@ __all__ = [
 
 
 # ----------------------------------------------------------------------
-# format utilities
+# typing utilities
 # ----------------------------------------------------------------------
 
 def date_dmy(item):
@@ -158,5 +158,66 @@ def cast_record(record, metadata):
     return record
 
 
-class Record(object):
-    pass
+# ----------------------------------------------------------------------
+# things from environment, and so derived
+# ----------------------------------------------------------------------
+
+"""
+CREATE SCHEMA IF NOT EXISTS redcapp;
+
+CREATE TABLE IF NOT EXISTS redcapp.atom(
+  id CHAR PRIMARY KEY,
+
+  netloc CHAR,
+  path CHAR,
+
+  user_id CHAR,
+
+  inserted_at TIMESTAMP,
+  modified_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS redcapp.user(
+  id CHAR PRIMARY KEY,
+  
+  name CHAR,
+  email CHAR,
+
+  inserted_at TIMESTAMP,
+  modified_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS redcapp.query(
+  id INTEGER PRIMARY KEY
+  
+  content CHAR,
+  format CHAR,
+  type CHAR,
+  records CHAR,
+  forms CHAR,
+  events CHAR,
+  rawOrLabel CHAR,
+  rawOrLabelHeaders CHAR,
+  exportCheckboxLabel CHAR,
+  returnFormat CHAR,
+  exportSurveyFields CHAR,
+  exportDataAccessGroups CHAR,
+  filterLogic CHAR,
+
+  inserted_at TIMESTAMP,
+  modified_at TIMESTAMP
+);
+"""
+
+
+class Environment:
+    API_HOST = os.getenv("REDCAP_API_HOST", None)
+    API_PATH = os.getenv("REDCAP_API_PATH", None)
+    API_TOKEN = os.getenv("REDCAP_API_TOKEN", None)
+    HTTP_HEADERS = {
+        "accept": "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+        "location": API_PATH,
+        "user-agent": "{}/{}".format("redcapp", "1.0")
+    }
+    TLS_CERTBUNDLE = os.getenv("REDCAP_API_CERTS", None)

@@ -6,13 +6,14 @@
 
 #import csv
 from http import client, HTTPStatus
-#import inspect
+import itertools
 import json
 import os
 import socket
 import ssl
 import urllib.parse
 
+from . import RedcapException
 from .helpers import (
     make_pythonic,
     cast_record,
@@ -23,24 +24,7 @@ __all__ = ["Connector"]
 
 
 # ----------------------------------------------------------------------
-# things from environment, and so derived
-# ----------------------------------------------------------------------
-
-CERTBUNDLE = os.getenv("REDCAPP_CLIENT_CERTS", None)
-HOST = os.getenv("REDCAPP_HOST", None)
-API_PATH = os.getenv("REDCAPP_API_DIR", None)
-HEADERS = {
-    "user-agent" : "{}/{}".format("redcapp", "1.0"), # FIXME
-    "content-type" : "application/x-www-form-urlencoded",
-    "accept-encoding" : "identity",
-    "host": HOST,
-    "location": API_PATH
-}
-TOKEN = os.getenv("REDCAP_TOKEN", None)
-
-
-# ----------------------------------------------------------------------
-# Connector classes
+# Connector objects
 # ----------------------------------------------------------------------
 
 
@@ -54,23 +38,25 @@ class BaseConnector(client.HTTPSConnection):
     def __init__(self):
         """Initialize BaseConnector instance"""
 
-        # handle TLS situation
         if CERTBUNDLE:
-            self.ssl_context = ssl.create_default_context(
+            ssl_context = ssl.create_default_context(
                 ssl.Purpose.SERVER_AUTH
             )
             ssl_context.load_cert_chain(CERTBUNDLE)
         else:
-            self.ssl_context = ssl.create_default_context()
+            ssl_context = ssl.create_default_context()
 
-        # initialize the base connector
         super().__init__(
             host = HOST,
             port = client.HTTPS_PORT, 
             timeout = socket._GLOBAL_DEFAULT_TIMEOUT,
-            context = self.ssl_context
+            context = ssl_context
         )
     
+    def getresponse(self, *args, **kwgs):
+        pass
+
+    # TODO: move to Connector
     @staticmethod
     def post_urlencoded(connection, data=None):
         """Handles POST procedure. Returns response data"""
@@ -85,15 +71,17 @@ class BaseConnector(client.HTTPSConnection):
                 data
             ).encode("latin-1")
         elif isinstance(data, (list, tuple)):
-            raise RuntimeError("not implemented :/")
+            raise RedcappException("Cannot URL-encode data :/")
         
         # POST request data
         try:
+
+            # put together and send request
             connection.putrequest(
                 method="POST",
                 url=API_PATH,
-                skip_host=True,
-                skip_accept_encoding=True
+                skip_host=False,
+                skip_accept_encoding=False
             )
             for k,v in HEADERS.items():
                 connection.putheader(k,v)
@@ -102,26 +90,38 @@ class BaseConnector(client.HTTPSConnection):
                 encode_chunked=False
             )
 
-        # just raise the problem
+            # instantiate response, headers, etc
+            response = connection.getresponse()
+            resp_headers = response.getheaders()
+            if len(resp_headers) > 1:
+                resp_headers.sort(key=lambda t: t[0])
+                resp_headers = {
+                    k.lower() : v for k, v
+                    in itertools.groupby(
+                        resp_headers,
+                        key=lambda t: t[0]
+                    )
+                }
+            else: resp_headers = dict(resp_headers)
+
+        # WIP: exception blocks
+        except client.ResponseNotReady: raise
+        except ConnectionError: raise
         except: raise
 
-        # if no excpetions, get the response
+        # do course of action on HTTP headers
         else:
-            response = connection.getresponse()
+            if resp_headers.get("connection") == "keep-alive":
+                connection.timeout, connection.retries = resp_headers.get(
+                    "keep-alive"
+                ).split(",")
 
-            # get data on 200
-            if response.status != HTTPStatus.OK:
-                connection.close()
-                raise http.client.HTTPException(
-                    "No data :/"
-                )
+                
+        # 
         finally:
-
-            # close and return data
-            connection.close()
             return response.read().decode("latin-1")
 
-        # TODO: keep-alive support, link support
+        # TODO: finish keep-alive support, begin link support
 
 
 class Connector(BaseConnector):
@@ -130,7 +130,7 @@ class Connector(BaseConnector):
     class is where all the API-specific logic is dealt with.
     """
 
-    def __init__(self, token=None, deserializer=json.loads):
+    def __init__(self, token=TOKEN, deserializer=json.loads):
         """Initialize Connector instance"""
 
         # just get the token
@@ -189,6 +189,13 @@ class Connector(BaseConnector):
         return False
 
 
+# ----------------------------------------------------------------------
+# Session object
+# ----------------------------------------------------------------------
+
+class Session:
+
+
 if __name__ == "__main__":
     pass
 
@@ -236,5 +243,6 @@ old load-metadata procedure from Connector.__init__:
                 self.meta.append((fn["export_field_name"], metadatum))
             self.meta = dict(self.meta)
 
-    This procedure was removed because it's not a real aspect in wrapping the API
+    This procedure was removed because it's not a necessary
+    aspect in wrapping the API -will
 """
