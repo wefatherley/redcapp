@@ -44,7 +44,7 @@ def make_logic_pythonic(logic):
         return ""
     checkbox_snoop = re.findall(r"\[[a-z0-9_]*\([0-9]*\)\]", logic)
     if len(checkbox_snoop) > 0:
-        for item in checkbox_snoop: #left to right
+        for item in checkbox_snoop:
             item = re.sub(r"\)\]", "\']", item)
             item = re.sub(r"\(", "___", item)
             item = re.sub(r"\[", "record[\'", item)
@@ -72,3 +72,10 @@ def cast_record(record, metadata):
             ]
         ](v)
     return record
+
+
+def make_sql_migration(metadata):
+    pass
+
+
+__all__ = ["make_logic_pythonic", "make_sql_migration"]
