@@ -1,10 +1,10 @@
 from ast import literal_eval
 from datetime import date, datetime, time
-from re import findall, sub
+from re import compile, finditer, sub
 
 
 class Metadata(dict):
-    """Abstraction of REDCap metadata"""
+    """Abstraction for REDCap metadata, and corresponding functionality"""
     
     cast_map = {
         "date_dmy": lambda d: date.strptime(d, "%d-%m-%Y"),
@@ -41,38 +41,58 @@ class Metadata(dict):
         "": str
     }
 
-    @classmethod
-    def dump_logic(cls, logic):
-        """Convert Python logic syntax to REDCap logic syntax"""
-        pass
+    load_variable_re = compile(r"\[[a-z0-9_()]+\]")
+    load_operator_re = compile(r"[=<>!]{1}=*")
+    dump_variable_re = compile(r"record\['[a-z0-9_]+'\]")
+    dump_operator_re = compile(r"[=!]{1}=*")
 
     @classmethod
     def load_logic(cls, logic):
         """Convert REDCap logic syntax to Python logic syntax"""
         if not logic:
             return ""
-        checkbox_snoop = findall(r"\[[a-z0-9_]*\([0-9]*\)\]", logic)
-        if len(checkbox_snoop) > 0:
-            for item in checkbox_snoop:
-                item = sub(r"\)\]", "\']", item)
-                item = sub(r"\(", "___", item)
-                item = sub(r"\[", "record[\'", item)
-                logic = sub(r"\[[a-z0-9_]*\([0-9]*\)\]", item, logic)
-        for pattern, substitute in [
-            (r"<=", "Z11Z"),
-            (r">=", "X11X"),
-            (r"=", "=="),
-            (r"Z11Z", "<="),
-            (r"X11X", ">="),
-            (r"<>", "!="),
-            (r"\[", "record[\'"),
-            (r"\]", "\']")
-        ]:
-            logic = sub(patern, substitute, logic)
+        for match in self.load_variable_re.finditer(logic):
+            var_str = match.group(0).strip("[]")
+            if "(" in var_str and ")" in var_str:
+                var_str = "___".join(
+                    [s.strip(")") for s in var_str.split("(")]
+                )
+            var_str = "record['" + var_str + "']"
+            logic = logic[:match.start()] + var_str + logic[:match.end()]
+        for match in self.load_operator_re.finditer(logic):
+            ope_str = match.group(0)
+            if ope_str == "=": ope_str = "=="
+            elif ope_str == "<>": ope_str = "!="
+            logic = logic[:match.start()] + ope_str + logic[:match.end()]
         return logic
 
+    @classmethod
+    def dump_logic(cls, logic):
+        """Convert Python logic syntax to REDCap logic syntax"""
+        if not logic:
+            return ""
+        for match in self.dump_variable_re.finditer(logic):
+            var_str = match.group(0).lstrip("record['").rstrip("']")
+            if "___" in var_str:
+                var_str = "(".join(var_str.split("___")) + ")"
+            var_str = "[" + var_str + "]"
+            logic = logic[:match.start()] + var_str + logic[:match.end()]
+        for match in self.dump_operator_re.finditer(logic):
+            ope_str = match.group(0)
+            if ope_str == "==": ope_str = "="
+            elif ope_str == "!=": ope_str = "<>"
+            logic = logic[:match.start()] + ope_str + logic[:match.end()]
+        return logic
+
+    @classmethod
+    def evaluate_logic(cls, logic):
+        try: logic = eval(logic)
+        except SyntaxError: logic = eval(cls.load_logic(logic))
+        else: return logic
+
     def __init__(self, raw_metadata, raw_field_names):
-        pass
+        """Contructor"""
+        super().__init__()
 
     def load_record(self, record):
         """Return record with Python typing"""
