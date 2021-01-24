@@ -1,14 +1,19 @@
-from logging import getLogger
+from json import dumps, loads
 
 from .connect import *
-from .util import *
+from .metadata import *
+
+
+class REDCapException(Exception): pass
 
 
 class Connector(BaseConnector):
     """Communicates with REDCap API via local state"""
 
-    def __init__(self, mime_type, host, path, token):
+    def __init__(self, host, path, token):
         """Construct object with mime type, and environment"""
+        if path is None or token is None:
+            raise REDCapException("path and/or token required")
         self.path_stack.append(path)
         self.token = token
         super().__init__(host)
@@ -55,6 +60,8 @@ class Connector(BaseConnector):
 
     def __enter__(self):
         """Support context manager protocol"""
+        if self.sock is None:
+            self.connect()
         return self
 
     def __exit__(self, typ, val, trb):
@@ -62,4 +69,4 @@ class Connector(BaseConnector):
         return False
 
 
-__all__ = ["Connector", "make_logic_pythonic", "make_sql_migration"]
+__all__ = ["Connector", "Metadata"]

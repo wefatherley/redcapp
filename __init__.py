@@ -1,16 +1,28 @@
+from csv import DictWriter
+from logging import getLogger
 from os import getenv
+from statistics import mean
 
 from .core import *
 
 
-class REDCap:
-    def __init__(self, **kwargs):
-        if "mime_type" not in kwargs:
-            mime_type = "json"
+LOGGER = getLogger(__name__)
+
+
+class Project:
+
+    def __init__(self, host=None, path=None, token=None):
+        """Initialize API connector and metadata for user project"""
         self.api = Connector(
-            mime_type,
-            kwargs["host"] or getenv("REDCAP_API_HOST"),
-            kwargs["path"] or getenv("REDCAP_API_PATH"),
-            kwargs["token"] or getenv("REDCAP_API_TOKEN")
+            host or getenv("REDCAP_API_HOST"),
+            path or getenv("REDCAP_API_PATH"),
+            token or getenv("REDCAP_API_TOKEN")
         )
+        with self.api as api:
+            self.metadata = Metadata(
+                api.metadata("export"), api.field_names("export")
+            )
+
+    def summary(self, **kwargs):
+        pass
         

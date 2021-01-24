@@ -25,24 +25,25 @@ class BaseConnector(client.HTTPSConnection):
             self.endheaders(
                 message_body=urlencode(data).encode("latin-1")
             )
-        except:
+        except Exception as e:
             # TODO: perform certain retries
-            LOGGER.error(
-                "bad request: status=%i, reason=%s",
-                response.status, response.reason
-            )
-            return ""
+            LOGGER.error("request threw exception: exc=%s", e)
+            return None
         else:
             response = self.getresponse()
             response.headers = {k.lower(): v for k,v in response.headers}
-            if response.status == 200:
+            if response.status == HTTPStatus.OK:
                 LOGGER.info(
                     "response received sucessfully: octets=%s",
                     response.headers.get("content-length")
                 )
                 self.path_stack = self.path_stack[:1]
-                return response.read().decode("latin-1")
-            elif 300 <= response.status <= 399:
+                return response
+            elif (
+                HTTPStatus.MULTIPLE_CHOICES
+                <= response.status <
+                HTTPStatus.BAD_REQUEST
+            ):
                 LOGGER.info(
                     "following redirect: link=%s",
                     response.headers.get("link")
@@ -52,25 +53,26 @@ class BaseConnector(client.HTTPSConnection):
                 )
                 self.path_stack.append(redirect_path)
                 return self.post(data)
-            elif 400 <= response.status <= 499:
+            elif (
+                HTTPStatus.BAD_REQUEST
+                <= response.status <=
+                HTTPStatus.INTERNAL_SERVER_ERROR
+            ):
                 # TODO: perform certain retries
                 LOGGER.error(
                     "bad request: status=%i, reason=%s",
                     response.status, response.reason
                 )
-                return ""
-            elif 500 <= response.status <= 599:
+                return None
+            elif HTTPStatus.INTERNAL_SERVER_ERROR <= response.status:
                 # TODO: perform certain retries
                 LOGGER.error(
                     "API issues: status=%i, reason=%s",
                     response.status, response.reason
                 )
-                return ""
+                return None
 
     @staticmethod
     def parse_link_header(header):
         """Returns a URL from link header value"""
         pass
-
-
-__all__ = ["BaseConnector"]

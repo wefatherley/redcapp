@@ -1,6 +1,3 @@
-.. image:: http://u-ts.net/recapp.png
-  :target: http://u-ts.net/
-  :alt: Redcapp Logo
-  :align: right
 # redcapp
+Wraps the REDCap API, has convenient ETL/analytical tools.
 <hr>
