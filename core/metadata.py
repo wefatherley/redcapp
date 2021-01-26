@@ -82,8 +82,21 @@ class Metadata(dict):
 
     def __init__(self, raw_metadata, raw_field_names):
         """Contructor"""
-        super().__init__()
+        self.raw_metadata = {d["field_name"]: d for d in raw_metadata}
+        self.raw_field_names = {
+            d["export_field_name"]: d for d in raw_field_names
+        }
 
+    def __getitem__(self, key):
+        """Lazy getter"""
+        if key not in self:
+            raw_metadatum = self.raw_metadata[
+                self.raw_field_names[key]["original_field_name"]
+            ]
+            metadatum["pbl"] = self.load_logic(metadatum["branching_logic"])
+            self.__setitem__(key, metadatum)
+        return super().__getitem__(key)
+        
     def evaluate_logic(self, logic):
         try: logic = eval(logic)
         except SyntaxError: logic = eval(self.load_logic(logic))
@@ -146,4 +159,35 @@ class Metadata(dict):
 
     def write_edit_table_html(self):
         """Return a file-like containing metadata's HTML edit table"""
+        pass
+        
+
+class Metadatum(dict):
+    """WIP Validated metadata column"""
+
+    def __init__(self):
+        """Constructor that refuses kwargs"""
+        super().__init__(
+            field_name=None,
+            form_name=None,
+            section_header=None,
+            field_type=None,
+            field_label=None,
+            select_choices_or_calculations=None,
+            field_note=None,
+            text_validation_type_or_show_slider_number=None,
+            text_validation_min=None,
+            text_validation_max=None,
+            identifier=None,
+            branching_logic=None,
+            required_field=None,
+            custom_alignment=None,
+            question_number=None,
+            matrix_group_name=None,
+            matrix_ranking=None,
+            field_annotation=None
+        )
+
+    def __setitem__(self, key, value):
+        """Validating item setter"""
         pass
