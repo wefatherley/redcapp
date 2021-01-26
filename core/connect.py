@@ -1,5 +1,6 @@
-"""Connector objects and related items"""
+"""Connector objects"""
 from http import client, HTTPStatus
+from io import BytesIO, IOBase
 from logging import getLogger
 from urllib.parse import urlencode
 
@@ -8,10 +9,10 @@ LOGGER = getLogger(__name__)
 
 
 class Connector(BaseConnector):
-    """REDCap API wrapper"""
+    """REDCap methods comtainer"""
 
     def __init__(self, host, path, token):
-        """Construct object with mime type, and environment"""
+        """Construct API wrapper"""
         if path is None or token is None:
             raise RuntimeError("path and/or token required")
         self.path_stack.append(path)
@@ -69,14 +70,14 @@ class Connector(BaseConnector):
 
 
 class BaseConnector(client.HTTPSConnection):
-    """HTTP logic for REDCap API"""
+    """HTTP methods container"""
 
     path_stack = list()
     req_headers = {
         "accept": "application/json",
         "content-type": "application/x-www-form-urlencoded"
     }
-        
+    
     def post(self, data):
         """Handles POST procedure. Returns response data as a string"""
         try:
@@ -84,7 +85,7 @@ class BaseConnector(client.HTTPSConnection):
             for k,v in self.req_headers.items():
                 self.putheader(k,v)
             self.endheaders(
-                message_body=urlencode(data).encode("latin-1")
+                message_body=self.build_body(data)
             )
         except Exception as e:
             # TODO: perform certain retries
@@ -105,6 +106,7 @@ class BaseConnector(client.HTTPSConnection):
                 <= response.status <
                 HTTPStatus.BAD_REQUEST
             ):
+                # TODO: perform certain retries
                 LOGGER.info(
                     "following redirect: link=%s",
                     response.headers.get("link")
@@ -133,10 +135,16 @@ class BaseConnector(client.HTTPSConnection):
                 )
                 return None
 
-    @staticmethod
-    def parse_link_header(header):
+    def parse_link_header(self, header):
         """Returns a URL from link header value"""
         pass
 
+    def build_body(self, data):
+        """Return an FileIO instance with data to send"""
+        if isinstance(data, (dict, list, tuple)):
+            data = BytesIO(urlencode(data).encode("latin-1"))
+        if not isinstance(data, IOBase):
+            raise RuntimeError("Unable to build body")
+        return data
 
 __all__ = ["Connector"]

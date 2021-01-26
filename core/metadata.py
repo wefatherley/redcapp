@@ -80,12 +80,14 @@ class Metadata(dict):
     dump_variable_re = compile(r"record\['[\w]+'\]")
     dump_operator_re = compile(r"==|!=")
 
-    def __init__(self, raw_metadata, raw_field_names):
+    def __init__(self, raw_metadata=None, raw_field_names=None):
         """Contructor"""
-        self.raw_metadata = {d["field_name"]: d for d in raw_metadata}
-        self.raw_field_names = {
-            d["export_field_name"]: d for d in raw_field_names
-        }
+        if raw_field_names is not None and raw_metadata is not None:
+            self.raw_metadata = {d["field_name"]: d for d in raw_metadata}
+            self.raw_field_names = {
+                d["export_field_name"]: d for d in raw_field_names
+            }
+        super().__init__()
 
     def __getitem__(self, key):
         """Lazy getter"""
@@ -93,8 +95,10 @@ class Metadata(dict):
             raw_metadatum = self.raw_metadata[
                 self.raw_field_names[key]["original_field_name"]
             ]
-            metadatum["pbl"] = self.load_logic(metadatum["branching_logic"])
-            self.__setitem__(key, metadatum)
+            raw_metadatum["pbl"] = self.load_logic(
+                raw_metadatum["branching_logic"]
+            )
+            self.__setitem__(key, raw_metadatum)
         return super().__getitem__(key)
         
     def evaluate_logic(self, logic):
@@ -153,41 +157,8 @@ class Metadata(dict):
             ](v)
         return record
 
-    def write_sql_migration(self):
-        """Return a file-like containing metadata's SQL migration"""
-        pass
-
-    def write_edit_table_html(self):
-        """Return a file-like containing metadata's HTML edit table"""
-        pass
-        
-
-class Metadatum(dict):
-    """WIP Validated metadata column"""
-
-    def __init__(self):
-        """Constructor that refuses kwargs"""
-        super().__init__(
-            field_name=None,
-            form_name=None,
-            section_header=None,
-            field_type=None,
-            field_label=None,
-            select_choices_or_calculations=None,
-            field_note=None,
-            text_validation_type_or_show_slider_number=None,
-            text_validation_min=None,
-            text_validation_max=None,
-            identifier=None,
-            branching_logic=None,
-            required_field=None,
-            custom_alignment=None,
-            question_number=None,
-            matrix_group_name=None,
-            matrix_ranking=None,
-            field_annotation=None
-        )
-
-    def __setitem__(self, key, value):
-        """Validating item setter"""
-        pass
+    def write(self, path, fmt="self"):
+        """Write formatted metadata to path"""
+        if fmt == "self": pass
+        elif fmt == "sql_migration": pass
+        elif fmt == "html_table": pass
