@@ -1,5 +1,10 @@
-from .connect import *
+from logging import getLogger
+
+from .connector import *
 from .metadata import *
+
+
+LOGGER = getLogger(__name__)
 
 
 class Project:

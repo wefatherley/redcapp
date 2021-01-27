@@ -1,5 +1,9 @@
 from datetime import date, datetime, time
+from logging import getLogger
 from re import compile, finditer, sub
+
+
+LOGGER = getLogger(__name__)
 
 
 class Metadata(dict):
@@ -157,8 +161,11 @@ class Metadata(dict):
             ](v)
         return record
 
-    def write(self, path, fmt="self"):
+    def write(self, path, fmt="csv"):
         """Write formatted metadata to path"""
-        if fmt == "self": pass
+        if fmt == "csv": pass
         elif fmt == "sql_migration": pass
         elif fmt == "html_table": pass
+
+
+__all__ = ["Metadata"]
