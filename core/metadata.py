@@ -1,3 +1,4 @@
+"""Metadata object"""
 from datetime import date, datetime, time
 from logging import getLogger
 from re import compile, finditer, sub

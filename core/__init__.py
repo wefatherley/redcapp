@@ -8,7 +8,8 @@ LOGGER = getLogger(__name__)
 
 
 class Project:
-
+    """WIP"""
+    
     def __init__(self, host=None, path=None, token=None):
         """Initialize API connector and metadata for a project"""
         if host is None and path is None and token is None:

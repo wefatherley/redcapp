@@ -20,11 +20,11 @@ class BaseConnector(client.HTTPSConnection):
     def post(self, data):
         """Handles POST procedure. Returns HTTPResponse object"""
         try:
-            self.putrequest(method="POST", url=self.path_stack[-1])
-            for k,v in self.req_headers.items():
+            self.putrequest(method=self.method, url=self.path_stack[-1])
+            for k,v in request.headers.items():
                 self.putheader(k,v)
             self.endheaders(
-                message_body=self.build_body(data)
+                message_body=data
             )
         except Exception as e:
             # TODO: perform certain retries
@@ -38,7 +38,8 @@ class BaseConnector(client.HTTPSConnection):
                     "response received sucessfully: octets=%s",
                     response.headers.get("content-length")
                 )
-                self.path_stack = self.path_stack[:1]
+                if self.path_stack[-1] != self.path_stack[0]:
+                    self.path_stack[-1] = self.path_stack[0]
                 return response
             elif (
                 HTTPStatus.MULTIPLE_CHOICES
@@ -54,7 +55,7 @@ class BaseConnector(client.HTTPSConnection):
                     response.headers.get("link")
                 )
                 self.path_stack.append(redirect_path)
-                return self.post(data)
+                return self.post(request)
             elif (
                 HTTPStatus.BAD_REQUEST
                 <= response.status <=
@@ -78,17 +79,9 @@ class BaseConnector(client.HTTPSConnection):
         """Returns a URL from link header value"""
         pass
 
-    def build_body(self, data):
-        """Return an FileIO instance with data to send"""
-        if isinstance(data, (dict, list, tuple)):
-            data = BytesIO(urlencode(data).encode("latin-1"))
-        if not isinstance(data, IOBase):
-            raise RuntimeError("Unable to build body")
-        return data
-
 
 class Connector(BaseConnector):
-    """REDCap methods comtainer"""
+    """REDCap methods container"""
 
     def __init__(self, host, path, token):
         """Construct API wrapper"""
@@ -96,46 +89,55 @@ class Connector(BaseConnector):
             raise RuntimeError("path and/or token required")
         self.path_stack.append(path)
         self.token = token
+        self.method = "POST"
         super().__init__(host)
+
+    def format_data(self, data):
+        """Set a file-like body"""
+        if isinstance(data, (dict, list, tuple)):
+            data = BytesIO(urlencode(data).encode("latin-1"))
+        if not isinstance(data, IOBase):
+            raise RuntimeError("Unable to build body")
+        return data
         
-    def arms(self, action, **parameters):
+    def arms(self, data=None, **parameters):
         pass
 
-    def events(self, action, **parameters):
+    def events(self, data=None, **parameters):
         pass
 
-    def field_names(self, action, **parameters):
+    def field_names(self, data=None, **parameters):
         pass
 
-    def files(self, action, **parameters):
+    def files(self, data=None, **parameters):
         # PIL for images?
         pass
 
-    def instruments(self, action, **parameters):
+    def instruments(self, data=None, **parameters):
         pass
 
-    def metadata(self, action, **parameters):
+    def metadata(self, data=None, **parameters):
         pass
 
-    def projects(self, action, **parameters):
+    def projects(self, data=None, **parameters):
         pass
 
-    def records(self, action, **parameters):
+    def records(self, data=None, **parameters):
         pass
 
-    def repeating_ie(self, action, **parameters):
+    def repeating_ie(self, data=None, **parameters):
         pass
 
-    def reports(self, action, **parameters):
+    def reports(self, data=None, **parameters):
         pass
 
-    def redcap(self, action, **parameters):
+    def redcap(self, data=None, **parameters):
         pass
 
-    def surveys(self, action, **parameters):
+    def surveys(self, data=None, **parameters):
         pass
 
-    def users(self, action, **parameters):
+    def users(self, data=None, **parameters):
         pass
 
     def __enter__(self):
