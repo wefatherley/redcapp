@@ -1,5 +1,8 @@
 """Metadata object"""
+from csv import DictWriter
 from datetime import date, datetime, time
+from decimal import Context, Decimal, ROUND_HALF_UP
+from json import dumps
 from logging import getLogger
 from re import compile, finditer, sub
 
@@ -9,6 +12,30 @@ LOGGER = getLogger(__name__)
 
 class Metadata(dict):
     """Abstraction for REDCap metadata, and corresponding functionality"""
+
+    # metadata columns
+    columns = [
+        "field_name", "form_name", "section_header", "field_type", "field_label",
+        "select_choices_or_calculations", "field_note",
+        "text_validation_type_or_show_slider_number" ,"text_validation_min",
+        "text_validation_max", "identifier", "branching_logic", "required_field",
+        "custom_alignment", "question_number", "matrix_group_name", "matrix_ranking",
+        "field_annotation"
+    ]
+
+    # decimal context map
+    dcm = {
+        "number": Context(prec=None, rounding=ROUND_HALF_UP)
+        "number_1dp_comma_decimal": Context(prec=1, rounding=ROUND_HALF_UP)
+        "number_1dp": Context(prec=1, rounding=ROUND_HALF_UP)
+        "number_2dp_comma_decimal": Context(prec=2, rounding=ROUND_HALF_UP)
+        "number_2dp": Context(prec=2, rounding=ROUND_HALF_UP)
+        "number_3dp_comma_decimal": Context(prec=3, rounding=ROUND_HALF_UP)
+        "number_3dp": Context(prec=3, rounding=ROUND_HALF_UP)
+        "number_4dp_comma_decimal": Context(prec=4), rounding=ROUND_HALF_UP
+        "number_4dp": Context(prec=4, rounding=ROUND_HALF_UP)
+        "number_comma_decimal": Context(prec=None, rounding=ROUND_HALF_UP)
+    }
     
     load_cast_map = {
         "date_dmy": lambda d: date.strptime(d, "%d-%m-%Y"),
@@ -20,29 +47,39 @@ class Metadata(dict):
         "datetime_seconds_dmy": lambda d: datetime.strptime(d, "%Y-%m-%d %H:%M:%S"),
         "datetime_seconds_mdy": lambda d: datetime.strptime(d, "%m-%d-%Y %H:%M:%S"),
         "datetime_seconds_ymd": lambda d: datetime.strptime(d, "%Y-%m-%d %H:%M:%S"),
-        "email": str,
-        "integer": int,
-        "alpha_only": str,
-        "number": float,
-        "number_1dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_1dp": float,
-        "number_2dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_2dp": float,
-        "number_3dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_3dp": float,
-        "number_4dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_4dp": float,
-        "number_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "phone_australia": str,
-        "phone": str,
-        "postalcode_australia": str,
-        "postalcode_canada": str,
-        "ssn": str,
+        "email": lambda s: s,
+        "integer": lambda s: s,
+        "alpha_only": lambda s: s,
+        "number": lambda n: Decimal(sub(r",", ".", n), context=DCM["number"]),
+        "number_1dp_comma_decimal": lambda n: Decimal(
+            sub(r",", ".", n), context=DCM["number_1dp_comma_decimal"]
+        ),
+        "number_1dp":  lambda n: Decimal(n, context=DCM["number_1dp"]),
+        "number_2dp_comma_decimal": lambda n: Decimal(
+            sub(r",", ".", n), context=DCM["number_2dp_comma_decimal"]
+        ),
+        "number_2dp": lambda n: Decimal(n, context=DCM["number_2dp"]),
+        "number_3dp_comma_decimal": lambda n: Decimal(
+            sub(r",", ".", n), context=DCM["number_3dp_comma_decimal"]
+        ),
+        "number_3dp": lambda n: Decimal(n, context=DCM["number_3dp"]),
+        "number_4dp_comma_decimal": lambda n: Decimal(
+            sub(r",", ".", n), context=DCM["number_4dp_comma_decimal"]
+        ),
+        "number_4dp": lambda n: Decimal(n, context=DCM["number_4dp"]),
+        "number_comma_decimal": lambda n: Decimal(
+            sub(r",", ".", n), context=DCM["number_comma_decimal"]
+        ),
+        "phone_australia": lambda s: s,
+        "phone": lambda s: s,
+        "postalcode_australia": lambda s: s,
+        "postalcode_canada": lambda s: s,
+        "ssn": lambda s: s,
         "time": lambda t: time.strptime(t, "%H:%M"),
         "time_mm_ss": lambda t: time.strptime(t, "%M:%S"),
-        "vmrn": str,
-        "Zipcode": str,
-        "": str
+        "vmrn": lambda s: s,
+        "Zipcode": lambda s: s,
+        "": lambda s: s,
     }
 
     dump_cast_map = {
@@ -55,29 +92,29 @@ class Metadata(dict):
         "datetime_seconds_dmy": lambda d: d.strftime("%Y-%m-%d %H:%M:%S"),
         "datetime_seconds_mdy": lambda d: d.strftime("%m-%d-%Y %H:%M:%S"),
         "datetime_seconds_ymd": lambda d: d.strftime("%Y-%m-%d %H:%M:%S"),
-        "email": str,
+        "email": lambda s: s,
         "integer": int,
-        "alpha_only": str,
-        "number": float,
-        "number_1dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_1dp": float,
-        "number_2dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_2dp": float,
-        "number_3dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_3dp": float,
-        "number_4dp_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "number_4dp": float,
-        "number_comma_decimal": lambda n: float(sub(r",", ".", n)),
-        "phone_australia": str,
-        "phone": str,
-        "postalcode_australia": str,
-        "postalcode_canada": str,
-        "ssn": str,
+        "alpha_only": lambda s: s,
+        "number": lambda n: str(n),
+        "number_1dp_comma_decimal": lambda n: sub(r"\.", ",", str(n)),
+        "number_1dp": lambda n: str(n),
+        "number_2dp_comma_decimal": lambda n: sub(r"\.", ",", str(n)),
+        "number_2dp": lambda n: str(n),
+        "number_3dp_comma_decimal": lambda n: sub(r"\.", ",", str(n)),
+        "number_3dp": lambda n: str(n),
+        "number_4dp_comma_decimal": lambda n: sub(r"\.", ",", str(n)),
+        "number_4dp": lambda n: str(n),
+        "number_comma_decimal": lambda n: sub(r"\.", ",", str(n)),
+        "phone_australia": lambda s: s,
+        "phone": lambda s: s,
+        "postalcode_australia": lambda s: s,
+        "postalcode_canada": lambda s: s,
+        "ssn": lambda s: s,
         "time": lambda t: t.strftime("%H:%M"),
         "time_mm_ss": lambda t: t.strftime("%M:%S"),
-        "vmrn": str,
-        "Zipcode": str,
-        "": str
+        "vmrn": lambda s: s,
+        "Zipcode": lambda s: s,
+        "": lambda s: s,
     }
 
     load_variable_re = compile(r"\[[\w()]+\]")
@@ -88,6 +125,7 @@ class Metadata(dict):
     def __init__(self, raw_metadata=None, raw_field_names=None):
         """Contructor"""
         if raw_field_names is not None and raw_metadata is not None:
+            self.headers = list(raw_metadata[0].keys())
             self.raw_metadata = {d["field_name"]: d for d in raw_metadata}
             self.raw_field_names = {
                 d["export_field_name"]: d for d in raw_field_names
@@ -97,10 +135,10 @@ class Metadata(dict):
     def __getitem__(self, key):
         """Lazy getter"""
         if key not in self:
-            raw_metadatum = self.raw_metadata[
+            raw_metadatum = self.raw_metadata.pop(
                 self.raw_field_names[key]["original_field_name"]
-            ]
-            raw_metadatum["pbl"] = self.load_logic(
+            )
+            raw_metadatum["branching_logic"] = self.load_logic(
                 raw_metadatum["branching_logic"]
             )
             self.__setitem__(key, raw_metadatum)
@@ -164,7 +202,17 @@ class Metadata(dict):
 
     def write(self, path, fmt="csv"):
         """Write formatted metadata to path"""
-        if fmt == "csv": pass
+        if fmt == "csv":
+            with open(path, "w", newline="") as fp:
+                writer = DictWriter(fp, fieldnames=self.columns)
+                writer.writeheader()
+                for metadatum in self.raw_metadata:
+                    writer.writerow(metadatum)
+                for metadatum in self.values():
+                    metadatum["branching_logic"] = self.dump_logic(
+                        metadatum["branching_logic"]
+                    )
+                    writer.writerow(metadatum)
         elif fmt == "sql_migration": pass
         elif fmt == "html_table": pass
 
