@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from logging import basicConfig, INFO, getLogger, WARN
-from os import environ, getenv
+from os import environ, getenv, putenv
 
 
 basicConfig(
@@ -19,8 +19,8 @@ args = parser.parse_args()
 
 
 if args.command == "set-env":
-    environ["REDCAP_API_HOST"] = input("Enter API host: ")
-    environ["REDCAP_API_PATH"] = input("Enter API path: ")
-    environ["REDCAP_API_HOST"] = input("Enter API token: ")
+    putenv("REDCAP_API_HOST", input("Enter API host: "))
+    putenv("REDCAP_API_PATH", input("Enter API path: "))
+    putenv("REDCAP_API_TOKEN", input("Enter API token: "))
     
 

@@ -12,20 +12,17 @@ class BaseConnector(client.HTTPSConnection):
     """HTTP methods container"""
 
     path_stack = list()
-    req_headers = {
-        "accept": "application/json",
-        "content-type": "application/x-www-form-urlencoded"
-    }
+    delete_headers = {}
+    export_headers = {}
+    import_headers = {}
     
     def post(self, data):
         """Handles POST procedure. Returns HTTPResponse object"""
         try:
             self.putrequest(method=self.method, url=self.path_stack[-1])
-            for k,v in request.headers.items():
+            for k,v in self.effective_headers.items():
                 self.putheader(k,v)
-            self.endheaders(
-                message_body=data
-            )
+            self.endheaders(message_body=data)
         except Exception as e:
             # TODO: perform certain retries
             LOGGER.error("request threw exception: exc=%s", e)
@@ -77,7 +74,7 @@ class BaseConnector(client.HTTPSConnection):
 
     def parse_link_header(self, header):
         """Returns a URL from link header value"""
-        pass
+        raise NotImplementedError
 
 
 class Connector(BaseConnector):
@@ -92,7 +89,7 @@ class Connector(BaseConnector):
         self.method = "POST"
         super().__init__(host)
 
-    def format_data(self, data):
+    def prepare_data(self, data):
         """Set a file-like body"""
         if isinstance(data, (dict, list, tuple)):
             data = BytesIO(urlencode(data).encode("latin-1"))
@@ -124,7 +121,7 @@ class Connector(BaseConnector):
 
     def records(self, data=None, **parameters):
         pass
-
+        
     def repeating_ie(self, data=None, **parameters):
         pass
 
