@@ -2,6 +2,7 @@
 from csv import DictReader, DictWriter
 from datetime import date, datetime, time
 from decimal import Context, Decimal, ROUND_HALF_UP
+from html.parser import HTMLParser
 from itertools import groupby
 from logging import getLogger
 from re import compile, finditer, sub
@@ -12,8 +13,8 @@ LOGGER = getLogger(__name__)
 
 class SQL:
     create_schema = "CREATE SCHEMA IF NOT EXISTS {};\n"
-    create_table = "CREATE TABLE IF NOT EXISTS {}.{}();\n"
-    add_column = "ALTER TABLE {}.{} ADD COLUMN IF NOT EXISTS {} {};\n"
+    create_table = "CREATE TABLE IF NOT EXISTS {}();\n"
+    add_column = "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};\n"
 
 
 COLUMNS = [
@@ -27,16 +28,16 @@ COLUMNS = [
 
 
 DCM = { # decimal context map
-    "number": Context(prec=None, rounding=ROUND_HALF_UP)
-    "number_1dp_comma_decimal": Context(prec=1, rounding=ROUND_HALF_UP)
-    "number_1dp": Context(prec=1, rounding=ROUND_HALF_UP)
-    "number_2dp_comma_decimal": Context(prec=2, rounding=ROUND_HALF_UP)
-    "number_2dp": Context(prec=2, rounding=ROUND_HALF_UP)
-    "number_3dp_comma_decimal": Context(prec=3, rounding=ROUND_HALF_UP)
-    "number_3dp": Context(prec=3, rounding=ROUND_HALF_UP)
-    "number_4dp_comma_decimal": Context(prec=4), rounding=ROUND_HALF_UP
-    "number_4dp": Context(prec=4, rounding=ROUND_HALF_UP)
-    "number_comma_decimal": Context(prec=None, rounding=ROUND_HALF_UP)
+    "number": Context(prec=None, rounding=ROUND_HALF_UP),
+    "number_1dp_comma_decimal": Context(prec=1, rounding=ROUND_HALF_UP),
+    "number_1dp": Context(prec=1, rounding=ROUND_HALF_UP),
+    "number_2dp_comma_decimal": Context(prec=2, rounding=ROUND_HALF_UP),
+    "number_2dp": Context(prec=2, rounding=ROUND_HALF_UP),
+    "number_3dp_comma_decimal": Context(prec=3, rounding=ROUND_HALF_UP),
+    "number_3dp": Context(prec=3, rounding=ROUND_HALF_UP),
+    "number_4dp_comma_decimal": Context(prec=4, rounding=ROUND_HALF_UP),
+    "number_4dp": Context(prec=4, rounding=ROUND_HALF_UP),
+    "number_comma_decimal": Context(prec=None, rounding=ROUND_HALF_UP),
 }
 
 
@@ -116,7 +117,7 @@ RECORD_TYPE_MAP = {
     "number_2dp": (
         lambda n: Decimal(n, context=DCM["number_2dp"]),
         lambda n: str(n),
-        "FLOAT"
+        "FLOAT",
     ),
     "number_3dp_comma_decimal": (
         lambda n: Decimal(
@@ -139,7 +140,7 @@ RECORD_TYPE_MAP = {
     ),
     "number_4dp": (
         lambda n: Decimal(n, context=DCM["number_4dp"]),
-        lambda n: str(n),,
+        lambda n: str(n),
         "FLOAT",
     ),
     "number_comma_decimal": (
@@ -147,7 +148,7 @@ RECORD_TYPE_MAP = {
             sub(r",", ".", n), context=DCM["number_comma_decimal"]
         ),
         lambda n: sub(r"\.", ",", str(n)),
-        "FLOAT"
+        "FLOAT",
     ),
     "phone_australia": (lambda s: s, lambda s: s, "TEXT",),
     "phone": (lambda s: s, lambda s: s, "TEXT",),
@@ -163,6 +164,7 @@ RECORD_TYPE_MAP = {
         lambda t: time.strptime(t, "%M:%S"),
         lambda t: t.strftime("%M:%S"),
         "TIME"
+    ),
     "vmrn": (lambda s: s, lambda s: s, "TEXT",),
     "Zipcode": (lambda s: s, lambda s: s, "TEXT",),
     "": (lambda s: s, lambda s: s, "TEXT",),
@@ -176,7 +178,7 @@ DUMP_OPERATOR_RE = compile(r"==|!=")
 
 
 class Metadata(dict):
-    """Abstraction for REDCap metadata, and corresponding functionality"""
+    """REDCap metadata abstraction"""
 
     def __init__(self, raw_metadata=None, raw_field_names=None):
         """Contructor"""
@@ -211,9 +213,7 @@ class Metadata(dict):
         for match in LOAD_VARIABLE_RE.finditer(logic):
             var_str = match.group(0).strip("[]")
             if "(" in var_str and ")" in var_str:
-                var_str = "___".join(
-                    [s.strip(")") for s in var_str.split("(")]
-                )
+                var_str = "___".join(s.strip(")") for s in var_str.split("("))
             var_str = "record['" + var_str + "']"
             logic = logic[:match.start()] + var_str + logic[:match.end()]
         for match in LOAD_OPERATOR_RE.finditer(logic):
@@ -258,43 +258,52 @@ class Metadata(dict):
 
     def write(self, path, fmt="csv", **kwargs):
         """Write formatted metadata to path"""
-        for metadatum in self:
-            self[metadatum]["branching_logic"] = self.dump_logic(
-                self[metadatum]["branching_logic"]
+        for field_name in self:
+            self[field_name]["branching_logic"] = self.dump_logic(
+                self[field_name]["branching_logic"]
             )
         if fmt == "csv":
             with open(path, "w", newline="") as fp:
-                writer = DictWriter(fp, fieldnames=self.columns)
+                writer = DictWriter(fp, fieldnames=COLUMNS)
                 writer.writeheader()
                 for metadatum in self.raw_metadata:
                     writer.writerow(metadatum)
                 for metadatum in self.values():
                     writer.writerow(metadatum)
         elif fmt == "sql_migration":
-            migration = open(path, "w")
-            if "schema" in kwargs:
-                migration.write(SQL.create_schema.format(schema))
-            else:
-                schema = "public"
-            if "sql_by" not in kwargs:
-                sql_by = "field_type"
-            key = lambda d: d[sql_by]
-            for table, columns in groupby(
-                sorted(list(self.values()) + self.raw_metadata, key=key),
-                key=key
-            ):
-                migration.write(SQL.create_table.format(pubic, table))
-                for column in columns:
-                    migration.write(SQL.add_column.format(
-                        column, RECORD_TYPE_MAP[
-                            column["text_validation_type_or_show_slider_number"]
-                        ][2]
-                    )
+            with open(path, "w", newline="") as fp:
+                if "schema" in kwargs:
+                    fp.write(SQL.create_schema.format(kwargs["schema"]))
+                    schema = kwargs["schema"] + "."
+                else:
+                    schema = ""
+                if "table_groups" in kwargs:
+                    if kwargs["table_groups"] not in COLUMNS:
+                        raise Exception("Invalid table grouping :/")
+                    table_groups = kwargs["table_groups"]
+                else:
+                    table_groups = "field_type"
+                key = lambda d: d[table_groups]
+                for table, columns in groupby(
+                    sorted(list(self.values()) + self.raw_metadata, key=key),
+                    key=key
+                ):
+                    fp.write(SQL.create_table.format(schema + table))
+                    for c in columns:
+                        fp.write(
+                            SQL.add_column.format(
+                                schema + table,
+                                c["field_name"],
+                                RECORD_TYPE_MAP[
+                                    c["text_validation_type_or_show_slider_number"]
+                                ][2]
+                            )
+                        )
         elif fmt == "html_table":
             pass
-        for metadatum in self:
-            self[metadatum]["branching_logic"] = self.load_logic(
-                self[metadatum]["branching_logic"]
+        for field_name in self:
+            self[field_name]["branching_logic"] = self.load_logic(
+                self[field_name]["branching_logic"]
             )
 
 
